@@ -60,8 +60,8 @@ class TrainAvailability(BaseModel):
     train_name: str
     from_station: str
     to_station: str
-    departure_time: time
-    arrival_time: time
+    departure_time: Optional[time] = None   # <- changed
+    arrival_time: Optional[time] = None
     classes: List[ClassAvailability]
 
 

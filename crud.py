@@ -427,9 +427,20 @@ def search_trains(db: Session, from_station_name: str, to_station_name: str, tra
             func.lower(func.trim(Station.station_name)) == to_station_name.lower().strip()
         ).first()
 
-        if not from_station or not to_station:
-            logger.info(f"No station found: {from_station_name} or {to_station_name}")
-            return []
+        #if not from_station or not to_station:
+        #    logger.info(f"No station found: {from_station_name} or {to_station_name}")
+        #    return []
+        if from_station:
+            print(f"[DEBUG] From station '{from_station_name}' ID: {from_station.station_id}")
+            logger.info(f"From station '{from_station_name}' ID: {from_station.station_id}")
+        else:
+            print(f"[DEBUG] From station '{from_station_name}' not found!")
+
+
+        if to_station:
+             print(f"To station '{to_station_name}' found with ID: {to_station.station_id}")
+        else:
+             logger.warning(f"To station '{to_station_name}' not found!")
 
         from_station_id = from_station.station_id
         to_station_id = to_station.station_id
@@ -474,8 +485,8 @@ def search_trains(db: Session, from_station_name: str, to_station_name: str, tra
                     TrainSchedule.station_id == from_station_id
                 ).first()
 
-                departure_time = schedule.departure_time.time() if schedule else None
-                arrival_time = schedule.arrival_time.time() if schedule else None
+                departure_time = schedule.departure_time if schedule else None
+                arrival_time = schedule.arrival_time if schedule else None
 
                 train_list.append(TrainAvailability(
                     train_id=train.train_id,
@@ -496,7 +507,7 @@ def search_trains(db: Session, from_station_name: str, to_station_name: str, tra
         return []
 
 
-
+'''
 # ------------------- BOOK TICKET -------------------
 def book_ticket(db: Session, booking: BookingRequest):
     try:
@@ -578,3 +589,4 @@ def book_ticket(db: Session, booking: BookingRequest):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error booking ticket: {str(e)}")
+'''

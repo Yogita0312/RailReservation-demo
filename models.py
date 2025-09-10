@@ -85,7 +85,7 @@ from database import Base
 
 # ------------------- Stations -------------------
 class Station(Base):
-    __tablename__ = "stations"
+    __tablename__ = "polRail_stations"
     station_id = Column(Integer, primary_key=True, index=True)
     station_name = Column(String(100), unique=True, nullable=False)
 
@@ -99,10 +99,10 @@ class Station(Base):
 
 # ------------------- Trains -------------------
 class Train(Base):
-    __tablename__ = "trains"
+    __tablename__ = "polRail_trains"
     train_id = Column(Integer, primary_key=True, index=True)
     train_name = Column(String(100), nullable=False)
-    route_id = Column(Integer, ForeignKey("routes.route_id", ondelete="CASCADE"))  # <- add this
+    route_id = Column(Integer, ForeignKey("polRail_routes.route_id", ondelete="CASCADE"))  # <- add this
     train_no = Column(Integer)
     # relationships
     berth_classes = relationship("BerthClass", back_populates="train", cascade="all, delete-orphan")
@@ -112,10 +112,10 @@ class Train(Base):
 
 # ------------------- Routes -------------------
 class Route(Base):
-    __tablename__ = "routes"
+    __tablename__ = "polRail_routes"
     route_id = Column(Integer, primary_key=True, index=True)
-    source_station_id = Column(Integer, ForeignKey("stations.station_id", ondelete="CASCADE"))
-    destination_station_id = Column(Integer, ForeignKey("stations.station_id", ondelete="CASCADE"))
+    source_station_id = Column(Integer, ForeignKey("polRail_stations.station_id", ondelete="NO ACTION"))
+    destination_station_id = Column(Integer, ForeignKey("polRail_stations.station_id", ondelete="CASCADE"))
 
     # relationships
     source_station = relationship("Station", foreign_keys=[source_station_id], back_populates="source_routes")
@@ -124,10 +124,10 @@ class Route(Base):
 
 # ------------------- Route Stations -------------------
 class RouteStation(Base):
-    __tablename__ = "route_stations"
+    __tablename__ = "polRail_route_stations"
     route_station_id = Column(Integer, primary_key=True, index=True)
-    train_id = Column(Integer, ForeignKey("trains.train_id", ondelete="CASCADE"))
-    station_id = Column(Integer, ForeignKey("stations.station_id", ondelete="CASCADE"))
+    train_id = Column(Integer, ForeignKey("polRail_trains.train_id", ondelete="NO ACTION"))
+    station_id = Column(Integer, ForeignKey("polRail_stations.station_id", ondelete="CASCADE"))
     stop_number = Column(Integer, nullable=False)
     arrival_time = Column(Time)
     departure_time = Column(Time)
@@ -140,9 +140,9 @@ class RouteStation(Base):
 
 # ------------------- Berth Classes -------------------
 class BerthClass(Base):
-    __tablename__ = "berth_classes"
+    __tablename__ = "polRail_berth_classes"
     berth_class_id = Column(Integer, primary_key=True, index=True)
-    train_id = Column(Integer, ForeignKey("trains.train_id", ondelete="CASCADE"))
+    train_id = Column(Integer, ForeignKey("polRail_trains.train_id", ondelete="CASCADE"))
     class_type = Column(String(50), nullable=False)
     total_berths = Column(Integer, nullable=False)
     price = Column(Integer, nullable=False)
@@ -153,10 +153,10 @@ class BerthClass(Base):
 
 # ------------------- Train Seat Availability -------------------
 class TrainSeatAvailability(Base):
-    __tablename__ = "train_seat_availability"
+    __tablename__ = "polRail_train_seat_availability"
     availability_id = Column(Integer, primary_key=True, index=True)
-    train_id = Column(Integer, ForeignKey("trains.train_id"), nullable=False)
-    berth_class_id = Column(Integer, ForeignKey("berth_classes.berth_class_id", ondelete="CASCADE"))
+    train_id = Column(Integer, ForeignKey("polRail_trains.train_id"), nullable=False)
+    berth_class_id = Column(Integer, ForeignKey("polRail_berth_classes.berth_class_id", ondelete="CASCADE"))
     available_seats = Column(Integer, nullable=False)
     travel_date = Column(Date, nullable=False) 
     #total_berths = Column(Integer, nullable=False)
@@ -167,11 +167,11 @@ class TrainSeatAvailability(Base):
 
 # ------------------- Train Schedules -------------------
 class TrainSchedule(Base):
-    __tablename__ = "train_schedules"
+    __tablename__ = "polRail_train_schedules"
     schedule_id = Column(Integer, primary_key=True, index=True)
-    train_id = Column(Integer, ForeignKey("trains.train_id", ondelete="CASCADE"))
-    route_id = Column(Integer, ForeignKey("routes.route_id", ondelete="CASCADE"))
-    station_id = Column(Integer, ForeignKey("stations.station_id", ondelete="CASCADE"))
+    train_id = Column(Integer, ForeignKey("polRail_trains.train_id", ondelete="NO ACTION"))
+    route_id = Column(Integer, ForeignKey("polRail_routes.route_id", ondelete="CASCADE"))
+    station_id = Column(Integer, ForeignKey("polRail_stations.station_id", ondelete="NO ACTION"))
     departure_time = Column(Time)
     arrival_time = Column(Time)
     # relationships
@@ -180,7 +180,7 @@ class TrainSchedule(Base):
 
 # ------------------- Passengers -------------------
 class Passenger(Base):
-    __tablename__ = "passengers"
+    __tablename__ = "polRail_passengers"
     passenger_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     age = Column(Integer, nullable=False)
@@ -189,11 +189,11 @@ class Passenger(Base):
 
 # ------------------- Bookings -------------------
 class Booking(Base):
-    __tablename__ = "bookings"
+    __tablename__ = "polRail_bookings"
     booking_id = Column(Integer, primary_key=True, index=True)
-    passenger_id = Column(Integer, ForeignKey("passengers.passenger_id", ondelete="CASCADE"))
-    train_id = Column(Integer, ForeignKey("trains.train_id", ondelete="CASCADE"))
-    berth_class_id = Column(Integer, ForeignKey("berth_classes.berth_class_id", ondelete="CASCADE"))
+    passenger_id = Column(Integer, ForeignKey("polRail_passengers.passenger_id", ondelete="NO ACTION"))
+    train_id = Column(Integer, ForeignKey("polRail_trains.train_id", ondelete="NO ACTION"))
+    berth_class_id = Column(Integer, ForeignKey("polRail_berth_classes.berth_class_id", ondelete="CASCADE"))
     travel_date = Column(Date, nullable=False)
     seat_number = Column(Integer, nullable=False)
     status = Column(String(100), nullable=False)

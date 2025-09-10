@@ -200,7 +200,7 @@ from schemas import (
 )
 
 # ------------------- Create tables -------------------
-Base.metadata.create_all(bind=engine)
+#Base.metadata.create_all(bind=engine)
 
 # ------------------- FastAPI app -------------------
 app = FastAPI(title="Railway Booking System")
@@ -227,6 +227,7 @@ def search_trains(
     return trains
 
 # ------------------- Book Ticket -------------------
+'''
 @app.post(
     "/book_ticket",
     response_model=BookingSuccessResponse | BookingFailureResponse
@@ -236,3 +237,4 @@ def book_ticket(booking: BookingRequest, db: Session = Depends(get_db)):
     if isinstance(result, BookingFailureResponse):
         raise HTTPException(status_code=400, detail=result.message)
     return result
+'''
