@@ -88,7 +88,7 @@ class Station(Base):
     __tablename__ = "polRail_stations"
     station_id = Column(Integer, primary_key=True, index=True)
     station_name = Column(String(100), unique=True, nullable=False)
-
+    station_id_code = Column(String(100), nullable=False)
     # relationships
     source_routes = relationship("Route", back_populates="source_station",
                                  foreign_keys="Route.source_station_id")

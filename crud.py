@@ -398,7 +398,7 @@ def book_ticket(db: Session, booking: BookingRequest):
 
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, or_, func
 from datetime import date
 from models import Train, Route, Station, TrainSchedule, BerthClass, TrainSeatAvailability, Booking, Passenger
 from fastapi import HTTPException
@@ -420,12 +420,19 @@ def search_trains(db: Session, from_station_name: str, to_station_name: str, tra
     try:
         # Case-insensitive and trimmed station lookup
         from_station = db.query(Station).filter(
-            func.lower(func.trim(Station.station_name)) == from_station_name.lower().strip()
+        or_(
+        func.lower(func.trim(Station.station_name)) == from_station_name.lower().strip(),
+        func.lower(func.trim(Station.station_id_code)) == from_station_name.lower().strip()
+        )
         ).first()
 
         to_station = db.query(Station).filter(
-            func.lower(func.trim(Station.station_name)) == to_station_name.lower().strip()
+        or_(
+        func.lower(func.trim(Station.station_name)) == to_station_name.lower().strip(),
+        func.lower(func.trim(Station.station_id_code)) == to_station_name.lower().strip()
+        )
         ).first()
+
 
         #if not from_station or not to_station:
         #    logger.info(f"No station found: {from_station_name} or {to_station_name}")
