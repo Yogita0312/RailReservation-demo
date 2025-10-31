@@ -396,7 +396,6 @@ def book_ticket(db: Session, booking: BookingRequest):
 '''
 
 
-
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import aliased
 from sqlalchemy import and_, or_, func
@@ -412,6 +411,14 @@ from schemas import (
 )
 import logging
 
+import unicodedata
+
+def normalize(s: str):
+    return ''.join(
+        c for c in unicodedata.normalize('NFKD', s)
+        if not unicodedata.combining(c)
+    ).lower().strip()
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -420,13 +427,19 @@ logger = logging.getLogger(__name__)
 def search_trains(db: Session, from_station_name: str, to_station_name: str, travel_date: date):
     try:
         # 🔹 Find stations (case-insensitive)
-        from_station = db.query(Station).filter(
-            func.lower(func.trim(Station.station_name)) == from_station_name.lower().strip()
-        ).first()
+        from_station = None
+        stations = db.query(Station).all()
+        for s in stations:
+            if normalize(s.station_name) == normalize(from_station_name):
+                from_station = s
+                break
 
-        to_station = db.query(Station).filter(
-            func.lower(func.trim(Station.station_name)) == to_station_name.lower().strip()
-        ).first()
+# ✅ Normalize and match TO station
+        to_station = None
+        for s in stations:
+            if normalize(s.station_name) == normalize(to_station_name):
+                to_station = s
+                break
 
         if not from_station or not to_station:
             logger.warning(f"Invalid stations: {from_station_name}, {to_station_name}")
@@ -458,7 +471,16 @@ def search_trains(db: Session, from_station_name: str, to_station_name: str, tra
             return []
 
         # 🔹 Fetch trains for valid routes
-        trains = db.query(Train).filter(Train.route_id.in_(route_ids)).all()
+        #trains = db.query(Train).filter(Train.route_id.in_(route_ids)).all()
+        trains = (
+            db.query(Train)
+            .join(Route, Train.route_id == Route.route_id)
+            .join(RouteStation, Route.route_id == RouteStation.route_id)
+            .filter(RouteStation.route_id.in_(route_ids))
+            .distinct()
+            .all()
+        )
+
         train_list = []
 
         for train in trains:
@@ -484,28 +506,54 @@ def search_trains(db: Session, from_station_name: str, to_station_name: str, tra
                 ))
 
             # 🔹 Get schedules for departure & arrival stations
-            schedule_from = db.query(TrainSchedule).filter(
-                TrainSchedule.train_id == train.train_id,
-                TrainSchedule.station_id == from_station_id
-            ).first()
+            #schedule_from = db.query(TrainSchedule).filter(
+            #    TrainSchedule.train_id == train.train_id,
+            #    TrainSchedule.station_id == from_station_id
+            #).first()
 
-            schedule_to = db.query(TrainSchedule).filter(
-                TrainSchedule.train_id == train.train_id,
-                TrainSchedule.station_id == to_station_id
-            ).first()
+            #schedule_to = db.query(TrainSchedule).filter(
+            #    TrainSchedule.train_id == train.train_id,
+            #    TrainSchedule.station_id == to_station_id
+            #).first()
+    #===============================================================
+        from_stop = db.query(RouteStation).filter(
+            RouteStation.route_id == train.route_id,
+            RouteStation.station_id == from_station_id
+        ).first()
+
+        to_stop = db.query(RouteStation).filter(
+            RouteStation.route_id == train.route_id,
+            RouteStation.station_id == to_station_id
+        ).first()
+
+# Fallback to schedule table only if it's stored there
+        schedule_from = db.query(TrainSchedule).filter(
+            TrainSchedule.train_id == train.train_id,
+            TrainSchedule.station_id == from_station_id
+        ).first() or from_stop
+
+        schedule_to = db.query(TrainSchedule).filter(
+            TrainSchedule.train_id == train.train_id,
+            TrainSchedule.station_id == to_station_id
+        ).first() or to_stop
+        
+            
+
 
             # 🔹 Append result (even if no availability data found)
-            train_list.append(TrainAvailability(
+        train_list.append(
+            TrainAvailability(
                 train_id=train.train_id,
                 train_name=train.train_name,
                 train_no=train.train_no,
                 from_station=from_station.station_name,
                 to_station=to_station.station_name,
                 travel_date=travel_date,  # user-input reference date
-                departure_time=schedule_from.departure_time if schedule_from else None,
-                arrival_time=schedule_to.arrival_time if schedule_to else None,
+                departure_time = getattr(schedule_from, "departure_time", None),
+                arrival_time = getattr(schedule_to, "arrival_time", None),
                 classes=classes
-            ))
+            )
+        )    
 
         return train_list
 
