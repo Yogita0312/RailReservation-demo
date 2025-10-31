@@ -203,4 +203,3 @@ class Booking(Base):
     passenger = relationship("Passenger")
     train = relationship("Train")
     berth_class = relationship("BerthClass")
-
