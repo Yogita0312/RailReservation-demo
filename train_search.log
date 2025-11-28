@@ -1,0 +1,6 @@
+2025-11-28 09:11:28,932 | INFO | train_search | 🔥 search_trains called
+2025-11-28 09:11:28,934 | INFO | train_search | params: from=Warszawa Centralna to=Konin date=2025-11-28 time=None train_number=None
+2025-11-28 09:11:36,770 | INFO | train_search | No matching trains found after applying filters
+2025-11-28 09:14:12,781 | INFO | train_search | 🔥 search_trains called
+2025-11-28 09:14:12,781 | INFO | train_search | params: from=Warszawa Centralna to=Konin date=2025-11-28 time=None train_number=None
+2025-11-28 09:14:13,545 | INFO | train_search | No matching trains found after applying filters

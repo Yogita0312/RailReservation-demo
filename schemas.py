@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 from datetime import date, time
 from typing import Optional
@@ -11,6 +11,12 @@ class SearchRequest(BaseModel):
     from_station: str
     to_station: str
     travel_date: date
+    return_date: Optional[str] = None
+    train_name:  Optional[str] = None
+    train_number:  Optional[str] = None
+    train_class:  Optional[str] = None
+    train_type: Optional[str] = None
+    time:  Optional[str] = None
 
 class PassengerInfo(BaseModel):
     name: str
@@ -58,12 +64,25 @@ class ClassAvailability(BaseModel):
 class TrainAvailability(BaseModel):
     #train_no: int
     train_name: str
+    train_number: int | None = None
+    train_type: str | None = None
     from_station: str
     to_station: str
     departure_time: Optional[time] = None   # <- changed
     arrival_time: Optional[time] = None
+    departure_date: Optional[date] = None
     classes: List[ClassAvailability]
 
 
 class SearchResponse(BaseModel):
-    trains: List[TrainAvailability]
+    onward: List[TrainAvailability]
+    return_: List[TrainAvailability] = Field(..., alias="return")
+
+    class Config:
+        populate_by_name = True
+        allow_population_by_field_name = True   
+
+class RoundTripResponse(BaseModel):
+    onward: List[TrainAvailability]
+    return_trains: List[TrainAvailability]
+
