@@ -169,7 +169,7 @@ def search_trains(
                 if bc:
                     avail = db.query(TrainSeatAvailability).filter(
                         TrainSeatAvailability.berth_class_id == bc.berth_class_id,
-                        TrainSeatAvailability.travel_date == travel_date
+                        #TrainSeatAvailability.travel_date == travel_date
                     ).first()
 
                     available = avail.available_seats if avail else 0
