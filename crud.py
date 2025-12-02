@@ -119,11 +119,11 @@ def search_trains(
 
             # ---------------- Time filter ----------------
             #if time:
-            input_t = datetime.strptime(time, "%H:%M").time()
-            start_t = (datetime.combine(date.today(), input_t) - timedelta(hours=1)).time()
-            end_t = (datetime.combine(date.today(), input_t) + timedelta(hours=1)).time()
-            if not (start_t <= rs_from.departure_time <= end_t):
-                continue
+            #input_t = datetime.strptime(time, "%H:%M").time()
+            #start_t = (datetime.combine(date.today(), input_t) - timedelta(hours=23)).time()
+            #end_t = (datetime.combine(date.today(), input_t) + timedelta(hours=23)).time()
+            #if not (start_t <= rs_from.departure_time <= end_t):
+            #    continue
 
             # ---------------- Classes & Availability ----------------
             berth_query = db.query(BerthClass).filter(BerthClass.train_id == train.train_id)
@@ -249,13 +249,13 @@ def search_trains(
                 if not rs_from_rt or not rs_to_rt or rs_from_rt.stop_number >= rs_to_rt.stop_number:
                     continue
 
-                if return_time:
-                    input_rt = datetime.strptime(return_time, "%H:%M").time()
-                    start_rt = (datetime.combine(date.today(), input_rt) - timedelta(hours=1)).time()
-                    end_rt = (datetime.combine(date.today(), input_rt) + timedelta(hours=1)).time()
+                #if return_time:
+                #    input_rt = datetime.strptime(return_time, "%H:%M").time()
+                #    start_rt = (datetime.combine(date.today(), input_rt) - timedelta(hours=1)).time()
+                #    end_rt = (datetime.combine(date.today(), input_rt) + timedelta(hours=1)).time()
 
-                    if not (start_rt <= rs_from_rt.departure_time <= end_rt):
-                        continue    
+                #    if not (start_rt <= rs_from_rt.departure_time <= end_rt):
+                #        continue    
 
                 # Classes availability for return date
                 classes_rt = []
