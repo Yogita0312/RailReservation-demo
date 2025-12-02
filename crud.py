@@ -32,12 +32,14 @@ def search_trains(
     from_station_name: str,
     to_station_name: str,
     travel_date: date,
+    train_class: str, 
+    time: str,
     return_date: date | None = None,
+    return_time: str | None = None,
     train_name: str | None = None,
     train_number: str | None = None,
-    train_type: str | None = None,
-    train_class: str | None = None,
-    time: str | None = None
+    train_type: str | None = None
+    
 ):
     try:
         logger.info("🔥 search_trains called")
@@ -90,13 +92,13 @@ def search_trains(
 
         # ---------------- Base Train Query ----------------
         trains_query = db.query(Train).filter(Train.route_id.in_(route_ids))
-        if train_number:
-            try:
-                trains_query = trains_query.filter(Train.train_no == int(train_number))
-            except ValueError:
-                raise HTTPException(400, "Train number must be numeric")
-        if train_name:
-            trains_query = trains_query.filter(Train.train_name.ilike(f"%{train_name}%"))
+        #if train_number:                    <==(commented this part so that api will not filter on basis on train name and no. Uncomment when required filtering)
+        #    try:
+        #        trains_query = trains_query.filter(Train.train_no == int(train_number))
+        #    except ValueError:
+        #        raise HTTPException(400, "Train number must be numeric")
+        #if train_name:
+        #    trains_query = trains_query.filter(Train.train_name.ilike(f"%{train_name}%"))
         if train_type:
             trains_query = trains_query.filter(Train.train_type.ilike(f"%{train_type}%"))
 
@@ -116,17 +118,17 @@ def search_trains(
                 continue
 
             # ---------------- Time filter ----------------
-            if time:
-                input_t = datetime.strptime(time, "%H:%M").time()
-                start_t = (datetime.combine(date.today(), input_t) - timedelta(hours=1)).time()
-                end_t = (datetime.combine(date.today(), input_t) + timedelta(hours=1)).time()
-                if not (start_t <= rs_from.departure_time <= end_t):
-                    continue
+            #if time:
+            input_t = datetime.strptime(time, "%H:%M").time()
+            start_t = (datetime.combine(date.today(), input_t) - timedelta(hours=1)).time()
+            end_t = (datetime.combine(date.today(), input_t) + timedelta(hours=1)).time()
+            if not (start_t <= rs_from.departure_time <= end_t):
+                continue
 
             # ---------------- Classes & Availability ----------------
             berth_query = db.query(BerthClass).filter(BerthClass.train_id == train.train_id)
-            if train_class:
-                berth_query = berth_query.filter(BerthClass.class_type.ilike(f"%{train_class}%"))
+            #if train_class:
+            berth_query = berth_query.filter(BerthClass.class_type.ilike(f"%{train_class}%"))
 
             # ---------------- Classes & Availability (Show only requested class if provided) ----------------
             classes = []
@@ -247,13 +249,21 @@ def search_trains(
                 if not rs_from_rt or not rs_to_rt or rs_from_rt.stop_number >= rs_to_rt.stop_number:
                     continue
 
+                if return_time:
+                    input_rt = datetime.strptime(return_time, "%H:%M").time()
+                    start_rt = (datetime.combine(date.today(), input_rt) - timedelta(hours=1)).time()
+                    end_rt = (datetime.combine(date.today(), input_rt) + timedelta(hours=1)).time()
+
+                    if not (start_rt <= rs_from_rt.departure_time <= end_rt):
+                        continue    
+
                 # Classes availability for return date
                 classes_rt = []
                 # ✅ add class filter ONLY (train filters must be ignored for return)
                 reverse_berth_query = db.query(BerthClass).filter(BerthClass.train_id == train.train_id)
 
-                if train_class:
-                    reverse_berth_query = reverse_berth_query.filter(
+                #if train_class:
+                reverse_berth_query = reverse_berth_query.filter(
                         BerthClass.class_type.ilike(f"%{train_class}%")
                     )
 

@@ -31,15 +31,16 @@ def search_trains(
     from_station: str = Query(..., description="Source station name"),
     to_station: str = Query(..., description="Destination station name"),
     travel_date: date = Query(..., description="Date of journey"),
+    train_class: str = Query(..., description="Train class preference"),
+    time: str= Query(..., description="Train time (HH:MM)"),
     return_date: date = Query(None, description="Date of return journey"),
+    return_time: str = Query(None, description="Time of return journey (HH:MM)"),
     train_name: str = Query(None, description="Name of the train"),
     train_number: str = Query(None, description="Train number"),
-    train_type: str = Query(None, description="Train type"),
-    train_class: str = Query(None, description="Train class preference"),
-    time: str= Query(None, description="Train time (HH:MM)"),
+    train_type: str = Query(None, description="Train type"), 
     db: Session = Depends(get_db)
 ):
-    trains = crud.search_trains(db, from_station, to_station, travel_date, return_date, train_name, train_number, train_type, train_class, time)
+    trains = crud.search_trains(db, from_station, to_station, travel_date, train_class, time, return_date, return_time, train_name, train_number, train_type)
     if not trains:
         raise HTTPException(status_code=404, detail="No trains found for this route")
     return trains

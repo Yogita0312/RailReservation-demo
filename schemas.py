@@ -11,12 +11,14 @@ class SearchRequest(BaseModel):
     from_station: str
     to_station: str
     travel_date: date
+    train_class: str
+    time: str
     return_date: Optional[str] = None
+    return_time: Optional[str] = None
     train_name:  Optional[str] = None
     train_number:  Optional[str] = None
-    train_class:  Optional[str] = None
     train_type: Optional[str] = None
-    time:  Optional[str] = None
+    
 
 class PassengerInfo(BaseModel):
     name: str
