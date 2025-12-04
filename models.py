@@ -89,6 +89,7 @@ class Station(Base):
     station_id = Column(Integer, primary_key=True, index=True)
     station_name = Column(String(100), unique=True, nullable=False)
     station_name_PL = Column(String(100), unique=True, nullable=False)
+    station_name_comb_PL = Column(String(100), unique=True, nullable=False)
     station_id_code = Column(String(100), nullable=False)
     # relationships
     source_routes = relationship("Route", back_populates="source_station",

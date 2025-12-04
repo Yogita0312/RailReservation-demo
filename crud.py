@@ -26,6 +26,27 @@ def normalize(s: str):
     ).lower().strip()
 
 
+# ---------------- Match station using name variants ----------------
+def match_station(user_input: str, station: Station):
+    norm_input = normalize(user_input)
+
+    # Match standard names
+    if normalize(station.station_name) == norm_input:
+        return True
+    if normalize(station.station_name_PL) == norm_input:
+        return True
+    if normalize(station.station_id_code) == norm_input:
+        return True
+
+    # Match alternative names stored as pipe-separated values
+    if station.station_name_comb_PL:
+        aliases = station.station_name_comb_PL.split("|")
+        for alias in aliases:
+            if normalize(alias) == norm_input:
+                return True
+
+    return False
+
 # ---------------- Main search function ----------------
 def search_trains(
     db: Session,
@@ -50,16 +71,14 @@ def search_trains(
 
 # Match by English OR Polish OR station code
         from_station = next(
-            (s for s in stations if normalize(s.station_name) == normalize(from_station_name)
-            or normalize(s.station_name_PL) == normalize(from_station_name)
-            or normalize(s.station_id_code) == normalize(from_station_name)),
-            None)
+            (s for s in stations if match_station(from_station_name, s)),
+            None
+        )
 
         to_station = next(
-            (s for s in stations if normalize(s.station_name) == normalize(to_station_name)
-            or normalize(s.station_name_PL) == normalize(to_station_name)
-            or normalize(s.station_id_code) == normalize(to_station_name)),
-            None)
+            (s for s in stations if match_station(to_station_name, s)),
+            None
+        )
 
         if not from_station or not to_station:
             raise HTTPException(404, "Station not found")
