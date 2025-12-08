@@ -111,20 +111,55 @@ def search_trains(
 
         # ---------------- Base Train Query ----------------
         trains_query = db.query(Train).filter(Train.route_id.in_(route_ids))
-        #if train_number:                    <==(commented this part so that api will not filter on basis on train name and no. Uncomment when required filtering)
-        #    try:
-        #        trains_query = trains_query.filter(Train.train_no == int(train_number))
-        #    except ValueError:
-        #        raise HTTPException(400, "Train number must be numeric")
-        #if train_name:
-        #    trains_query = trains_query.filter(Train.train_name.ilike(f"%{train_name}%"))
+        if train_number:                    
+            try:
+                trains_query = trains_query.filter(Train.train_no == int(train_number))
+            except ValueError:
+                raise HTTPException(400, "Train number must be numeric")
+        if train_name:
+            trains_query = trains_query.filter(Train.train_name.ilike(f"%{train_name}%"))
         if train_type:
             trains_query = trains_query.filter(Train.train_type.ilike(f"%{train_type}%"))
 
-        trains = trains_query.distinct().all()
+        # ---------------- Time-based nearest train filtering ----------------
+        if time:
+            input_t = datetime.strptime(time, "%H:%M").time()
+
+            # 3 trains BEFORE input time
+            before_trains = (
+                trains_query
+                .join(RouteStation, RouteStation.train_id == Train.train_id)
+                .filter(
+                    RouteStation.station_id == from_id,
+                    RouteStation.departure_time < input_t
+                )
+                .order_by(RouteStation.departure_time.desc())
+                .limit(3)
+                .all()
+            )
+
+            # 3 trains AFTER (including equal time)
+            after_trains = (
+                trains_query
+                .join(RouteStation, RouteStation.train_id == Train.train_id)
+                .filter(
+                    RouteStation.station_id == from_id,
+                    RouteStation.departure_time >= input_t
+                )
+                .order_by(RouteStation.departure_time.asc())
+                .limit(3)
+                .all()
+            )
+
+            # Final combined list (before trains in ascending order)
+            trains = list(reversed(before_trains)) + after_trains
+
+        else:
+            trains = trains_query.distinct().all()
+
         if not trains:
-            logger.info("No matching trains found after applying filters")
-            raise HTTPException(404, "No matching trains found")
+            raise HTTPException(404, "No trains found for selected time window")
+
 
         # ---------------- Build Result ----------------
         result = []
@@ -247,18 +282,64 @@ def search_trains(
         return_list = []
         if return_date:
             # Fetch all trains for reverse direction WITHOUT any filters
+            rf_rt = aliased(RouteStation)
+            rt_rt = aliased(RouteStation)
+
             reverse_routes = (
-                db.query(RouteStation.route_id)
+                db.query(rf_rt.route_id)
+                .join(rt_rt, rf_rt.route_id == rt_rt.route_id)
                 .filter(
-                    RouteStation.station_id.in_([from_id, to_id])
+                    rf_rt.station_id == to_id,      # return starts at TO
+                    rt_rt.station_id == from_id,    # return ends at FROM
+                    rf_rt.stop_number < rt_rt.stop_number
                 )
                 .distinct()
                 .all()
             )
+
             reverse_route_ids = [r[0] for r in reverse_routes]
 
             reverse_trains_query = db.query(Train).filter(Train.route_id.in_(reverse_route_ids))
+
             all_reverse_trains = reverse_trains_query.distinct().all()
+
+            # APPLY RETURN TIME FILTER (Top 6 Only)
+# ---------------------------------------------------------
+            if return_time:
+                input_rt = datetime.strptime(return_time, "%H:%M").time()
+
+                # 3 trains BEFORE return_time
+                before_rt = (
+                    reverse_trains_query
+                    .join(RouteStation, RouteStation.train_id == Train.train_id)
+                    .filter(
+                        RouteStation.station_id == to_id,
+                        RouteStation.departure_time < input_rt
+                    )
+                    .order_by(RouteStation.departure_time.desc())
+                    .limit(3)
+                    .all()
+                )
+
+                # 3 trains AFTER return_time
+                after_rt = (
+                    reverse_trains_query
+                    .join(RouteStation, RouteStation.train_id == Train.train_id)
+                    .filter(
+                        RouteStation.station_id == to_id,
+                        RouteStation.departure_time >= input_rt
+                    )
+                    .order_by(RouteStation.departure_time.asc())
+                    .limit(3)
+                    .all()
+                )
+
+                # combine both (before ascending)
+                all_reverse_trains = list(reversed(before_rt)) + after_rt
+
+            else:
+                # If return_time NOT provided → return ANY 6 trains
+                all_reverse_trains = all_reverse_trains[:6]
 
             # Build return result with Polish station names
             for train in all_reverse_trains:
