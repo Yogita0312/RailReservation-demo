@@ -80,8 +80,17 @@ def search_trains(
             None
         )
 
-        if not from_station or not to_station:
-            raise HTTPException(404, "Station not found")
+        if not from_station:
+            raise HTTPException(
+                status_code=404,
+                detail=f"From station '{from_station_name}' not found"
+            )
+
+        if not to_station:
+            raise HTTPException(
+                status_code=404,
+                detail=f"To station '{to_station_name}' not found"
+            )
 
         from_id = from_station.station_id
         to_id = to_station.station_id
@@ -107,15 +116,33 @@ def search_trains(
         )
         route_ids = [r[0] for r in route_rows]
         if not route_ids:
-            raise HTTPException(404, "No route contains both stations in correct order")
+            raise HTTPException(404, "There is no route between {polish_from} to {polish_to}")
 
         # ---------------- Base Train Query ----------------
         trains_query = db.query(Train).filter(Train.route_id.in_(route_ids))
-        if train_number:                    
+        if train_number:
             try:
-                trains_query = trains_query.filter(Train.train_no == int(train_number))
+                tn = int(train_number)
             except ValueError:
                 raise HTTPException(400, "Train number must be numeric")
+
+            # First check: train_no
+            primary_match = trains_query.filter(Train.train_no == tn)
+
+            if primary_match.count() > 0:
+                trains_query = primary_match
+            else:
+                # Second check: alternate_train_no
+                alternate_match = trains_query.filter(Train.alternate_train_no == tn)
+
+                if alternate_match.count() > 0:
+                    trains_query = alternate_match
+                else:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Train number {train_number} is not available for the route {polish_from} to {polish_to}"
+                    )
+
         if train_name:
             trains_query = trains_query.filter(Train.train_name.ilike(f"%{train_name}%"))
         if train_type:

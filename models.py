@@ -27,6 +27,7 @@ class Train(Base):
     train_type = Column(String(100), nullable=False)
     route_id = Column(Integer, ForeignKey("polRail_routes_2.route_id", ondelete="CASCADE"))  # <- add this
     train_no = Column(Integer)
+    alternate_train_no = Column(Integer)
     # relationships
     berth_classes = relationship("BerthClass", back_populates="train", cascade="all, delete-orphan")
     schedules = relationship("TrainSchedule", back_populates="train", cascade="all, delete-orphan")
