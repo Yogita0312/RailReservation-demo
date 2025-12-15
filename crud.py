@@ -144,9 +144,41 @@ def search_trains(
                     )
 
         if train_name:
-            trains_query = trains_query.filter(Train.train_name.ilike(f"%{train_name}%"))
+            train_name_exists = (
+                trains_query
+                .with_entities(Train.train_id)
+                .filter(Train.train_name.ilike(f"%{train_name}%"))
+                .first()
+            )
+
+            if not train_name_exists:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Train name '{train_name}' not found"
+                )
+
+            trains_query = trains_query.filter(
+                Train.train_name.ilike(f"%{train_name}%")
+            )
+
+        # Train type filter with validation
         if train_type:
-            trains_query = trains_query.filter(Train.train_type.ilike(f"%{train_type}%"))
+            train_type_exists = (
+                trains_query
+                .with_entities(Train.train_id)
+                .filter(Train.train_type.ilike(f"%{train_type}%"))
+                .first()
+            )
+
+            if not train_type_exists:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Train type '{train_type}' not found"
+                )
+
+            trains_query = trains_query.filter(
+                Train.train_type.ilike(f"%{train_type}%")
+            )
 
         # ---------------- Time-based nearest train filtering ----------------
         if time:
