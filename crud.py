@@ -116,7 +116,10 @@ def search_trains(
         )
         route_ids = [r[0] for r in route_rows]
         if not route_ids:
-            raise HTTPException(404, "There is no route between {polish_from} to {polish_to}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"There is no route between {polish_from} to {polish_to}"
+            )
 
         # ---------------- Base Train Query ----------------
         trains_query = db.query(Train).filter(Train.route_id.in_(route_ids))
