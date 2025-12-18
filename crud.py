@@ -49,25 +49,34 @@ def wildcard_match(text: str, pattern: str) -> bool:
 def match_station(user_input: str, station: Station):
     norm_input = normalize(user_input)
 
-    # Match standard names
+    # 1. Exact match on primary fields
     if normalize(station.station_name) == norm_input:
         return True
+
     if normalize(station.station_name_PL) == norm_input:
         return True
+
     if normalize(station.station_id_code) == norm_input:
         return True
 
-    # Match alternative names stored as pipe-separated values
+    # 2. Alias-based matching (controlled)
     if station.station_name_comb_PL:
         aliases = station.station_name_comb_PL.split("|")
+
         for alias in aliases:
-            if wildcard_match(
-                normalize(alias),
-                normalize(user_input)
-            ):
+            norm_alias = normalize(alias)
+
+            # a) Exact alias match (preferred)
+            if norm_alias == norm_input:
                 return True
 
+            # b) Wildcard match ONLY if user used wildcards
+            if "?" in user_input or "%" in user_input:
+                if wildcard_match(norm_alias, norm_input):
+                    return True
+
     return False
+
 
 # ---------------- Main search function ----------------
 def search_trains(
@@ -89,6 +98,38 @@ def search_trains(
     
 ):
     try:
+        # ---------------- Validate Mandatory Fields ----------------
+        if not from_station_name or from_station_name.strip() == "":
+            raise HTTPException(
+                status_code=400,
+                detail="From station is required and cannot be empty"
+            )
+
+        if not to_station_name or to_station_name.strip() == "":
+            raise HTTPException(
+                status_code=400,
+                detail="To station is required and cannot be empty"
+            )
+
+        if not travel_date:
+            raise HTTPException(
+                status_code=400,
+                detail="Travel date is required"
+            )
+
+        if not train_class or train_class.strip() == "":
+            raise HTTPException(
+                status_code=400,
+                detail="Train class is required and cannot be empty"
+            )
+
+        if not time or time.strip() == "":
+            raise HTTPException(
+                status_code=400,
+                detail="Time is required and cannot be empty"
+            )
+
+
         logger.info("🔥 search_trains called")
         logger.info(f"params: from={from_station_name} to={to_station_name} date={travel_date} time={time} train_number={train_number}")
 
