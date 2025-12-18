@@ -129,6 +129,10 @@ def search_trains(
                 detail="Time is required and cannot be empty"
             )
 
+        # ---------------- Set default return_train_class ----------------
+        if return_date and not return_train_class:
+            return_train_class = train_class
+
 
         logger.info("🔥 search_trains called")
         logger.info(f"params: from={from_station_name} to={to_station_name} date={travel_date} time={time} train_number={train_number}")
