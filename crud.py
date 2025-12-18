@@ -7,6 +7,7 @@ from models import Train, RouteStation, Station, BerthClass, TrainSeatAvailabili
 from schemas import TrainAvailability, ClassAvailability
 import unicodedata
 import logging
+import re
 
 # ---------------- Logger Setup ----------------
 logger = logging.getLogger("train_search")
@@ -25,6 +26,24 @@ def normalize(s: str):
         if not unicodedata.combining(c)
     ).lower().strip()
 
+# ---------------- Wildcard matcher helper function ----------------
+def wildcard_match(text: str, pattern: str) -> bool:
+    """
+    Replicates SQL:
+    lower(text) LIKE lower(replace(pattern, '?', '_'))
+    """
+    if not text or not pattern:
+        return False
+
+    # Escape regex special chars
+    regex = re.escape(pattern)
+
+    # SQL-style wildcards
+    regex = regex.replace(r'\?', '.')   # ? -> single character
+    regex = regex.replace(r'\%', '.*')  # % -> many characters
+
+    return re.search(regex, text, re.IGNORECASE) is not None
+
 
 # ---------------- Match station using name variants ----------------
 def match_station(user_input: str, station: Station):
@@ -42,7 +61,10 @@ def match_station(user_input: str, station: Station):
     if station.station_name_comb_PL:
         aliases = station.station_name_comb_PL.split("|")
         for alias in aliases:
-            if normalize(alias) == norm_input:
+            if wildcard_match(
+                normalize(alias),
+                normalize(user_input)
+            ):
                 return True
 
     return False
@@ -55,11 +77,15 @@ def search_trains(
     travel_date: date,
     train_class: str, 
     time: str,
-    return_date: date | None = None,
-    return_time: str | None = None,
     train_name: str | None = None,
     train_number: str | None = None,
-    train_type: str | None = None
+    train_type: str | None = None,
+    return_date: date | None = None,
+    return_time: str | None = None,
+    return_train_class: str | None = None,
+    return_train_number: str | None = None,
+    return_train_name: str | None = None,
+    return_train_type: str | None = None
     
 ):
     try:
@@ -120,7 +146,6 @@ def search_trains(
                 status_code=404,
                 detail=f"There is no route between {polish_from} to {polish_to}"
             )
-
         # ---------------- Base Train Query ----------------
         trains_query = db.query(Train).filter(Train.route_id.in_(route_ids))
         if train_number:
@@ -147,10 +172,11 @@ def search_trains(
                     )
 
         if train_name:
+            normalized_train_name = normalize(train_name)
             train_name_exists = (
                 trains_query
                 .with_entities(Train.train_id)
-                .filter(Train.train_name.ilike(f"%{train_name}%"))
+                .filter(Train.train_name.ilike(f"%{normalized_train_name}%"))
                 .first()
             )
 
@@ -161,7 +187,7 @@ def search_trains(
                 )
 
             trains_query = trains_query.filter(
-                Train.train_name.ilike(f"%{train_name}%")
+                Train.train_name.ilike(f"%{normalized_train_name}%")
             )
 
         # Train type filter with validation
@@ -339,116 +365,125 @@ def search_trains(
                 )
             )
 
-        # ---------------- Handle Return Trip ----------------
-        # ---------------- Handle Return Trip (No Filters Applied) ----------------
-        return_list = []
-        if return_date:
-            # Fetch all trains for reverse direction WITHOUT any filters
-            rf_rt = aliased(RouteStation)
-            rt_rt = aliased(RouteStation)
 
-            reverse_routes = (
-                db.query(rf_rt.route_id)
-                .join(rt_rt, rf_rt.route_id == rt_rt.route_id)
+        # ================= RETURN JOURNEY =================
+        return_list = []
+
+        if return_date:
+            rf, rt = aliased(RouteStation), aliased(RouteStation)
+            reverse_route_ids = [
+                r[0] for r in db.query(rf.route_id)
+                .join(rt, rf.route_id == rt.route_id)
                 .filter(
-                    rf_rt.station_id == to_id,      # return starts at TO
-                    rt_rt.station_id == from_id,    # return ends at FROM
-                    rf_rt.stop_number < rt_rt.stop_number
+                    rf.station_id == to_id,
+                    rt.station_id == from_id,
+                    rf.stop_number < rt.stop_number
                 )
                 .distinct()
                 .all()
-            )
+            ]
 
-            reverse_route_ids = [r[0] for r in reverse_routes]
+            if not reverse_route_ids:
+                raise HTTPException(
+                    404, f"There is no route between {polish_to} to {polish_from}"
+                )
 
-            reverse_trains_query = db.query(Train).filter(Train.route_id.in_(reverse_route_ids))
+            reverse_q = db.query(Train).filter(Train.route_id.in_(reverse_route_ids))
 
-            all_reverse_trains = reverse_trains_query.distinct().all()
-
-            # APPLY RETURN TIME FILTER (Top 6 Only)
-# ---------------------------------------------------------
-            if return_time:
-                input_rt = datetime.strptime(return_time, "%H:%M").time()
-
-                # 3 trains BEFORE return_time
-                before_rt = (
-                    reverse_trains_query
-                    .join(RouteStation, RouteStation.train_id == Train.train_id)
-                    .filter(
-                        RouteStation.station_id == to_id,
-                        RouteStation.departure_time < input_rt
+            if return_train_number:
+                rtn = int(return_train_number)
+                q = reverse_q.filter(
+                    (Train.train_no == rtn) | (Train.alternate_train_no == rtn)
+                )
+                if not q.count():
+                    raise HTTPException(
+                        404,
+                        f"Return train number {return_train_number} is not available for the route {polish_to} to {polish_from}"
                     )
+                reverse_q = q
+
+            if return_train_name:
+                q = reverse_q.filter(
+                    Train.train_name.ilike(f"%{normalize(return_train_name)}%")
+                )
+                if not q.count():
+                    raise HTTPException(404, f"Return train name '{return_train_name}' not found")
+                reverse_q = q
+
+            if return_train_type:
+                q = reverse_q.filter(
+                    Train.train_type.ilike(f"%{return_train_type}%")
+                )
+                if not q.count():
+                    raise HTTPException(404, f"Return train type '{return_train_type}' not found")
+                reverse_q = q
+
+            # -------- Time filter (RETURN) --------
+            if return_time:
+                t = datetime.strptime(return_time, "%H:%M").time()
+
+                before = (
+                    reverse_q.join(RouteStation)
+                    .filter(RouteStation.station_id == to_id, RouteStation.departure_time < t)
                     .order_by(RouteStation.departure_time.desc())
                     .limit(3)
                     .all()
                 )
 
-                # 3 trains AFTER return_time
-                after_rt = (
-                    reverse_trains_query
-                    .join(RouteStation, RouteStation.train_id == Train.train_id)
-                    .filter(
-                        RouteStation.station_id == to_id,
-                        RouteStation.departure_time >= input_rt
-                    )
+                after = (
+                    reverse_q.join(RouteStation)
+                    .filter(RouteStation.station_id == to_id, RouteStation.departure_time >= t)
                     .order_by(RouteStation.departure_time.asc())
                     .limit(3)
                     .all()
                 )
 
-                # combine both (before ascending)
-                all_reverse_trains = list(reversed(before_rt)) + after_rt
-
+                reverse_trains = list(reversed(before)) + after
             else:
-                # If return_time NOT provided → return ANY 6 trains
-                all_reverse_trains = all_reverse_trains[:6]
+                reverse_trains = reverse_q.distinct().all()
 
-            # Build return result with Polish station names
-            for train in all_reverse_trains:
-                rs_from_rt = db.query(RouteStation).filter(RouteStation.train_id == train.train_id, RouteStation.station_id == to_id).first()
-                rs_to_rt = db.query(RouteStation).filter(RouteStation.train_id == train.train_id, RouteStation.station_id == from_id).first()
+            for train in reverse_trains:
+                rs_from = db.query(RouteStation).filter(
+                    RouteStation.train_id == train.train_id,
+                    RouteStation.station_id == to_id
+                ).first()
 
-                if not rs_from_rt or not rs_to_rt or rs_from_rt.stop_number >= rs_to_rt.stop_number:
+                rs_to = db.query(RouteStation).filter(
+                    RouteStation.train_id == train.train_id,
+                    RouteStation.station_id == from_id
+                ).first()
+
+                if not rs_from or not rs_to or rs_from.stop_number >= rs_to.stop_number:
                     continue
 
-                #if return_time:
-                #    input_rt = datetime.strptime(return_time, "%H:%M").time()
-                #    start_rt = (datetime.combine(date.today(), input_rt) - timedelta(hours=1)).time()
-                #    end_rt = (datetime.combine(date.today(), input_rt) + timedelta(hours=1)).time()
-
-                #    if not (start_rt <= rs_from_rt.departure_time <= end_rt):
-                #        continue    
-
-                # Classes availability for return date
                 classes_rt = []
-                # ✅ add class filter ONLY (train filters must be ignored for return)
-                reverse_berth_query = db.query(BerthClass).filter(BerthClass.train_id == train.train_id)
+                berth_q = db.query(BerthClass).filter(BerthClass.train_id == train.train_id)
 
-                #if train_class:
-                reverse_berth_query = reverse_berth_query.filter(
-                        BerthClass.class_type.ilike(f"%{train_class}%")
+                if return_train_class:
+                    berth_q = berth_q.filter(
+                        func.lower(BerthClass.class_type).like(
+                            f"%{normalize(return_train_class)}%"
+                        )
                     )
 
-                for bc in reverse_berth_query.all():
-                    avail_rt = db.query(TrainSeatAvailability).filter(
-                        TrainSeatAvailability.berth_class_id == bc.berth_class_id,
-                        #TrainSeatAvailability.travel_date == return_date
+                for bc in berth_q.all():
+                    avail = db.query(TrainSeatAvailability).filter(
+                        TrainSeatAvailability.berth_class_id == bc.berth_class_id
                     ).first()
 
-                    available_rt = avail_rt.available_seats if avail_rt else 0
-                    booked_rt = bc.total_berths - available_rt
-                    logger.info(f"🔎 Return Availability Check → TrainID={bc.train_id}, Class={bc.class_type}, Available Seats={avail_rt}")
-
+                    available = avail.available_seats if avail else 0
                     classes_rt.append(
                         ClassAvailability(
                             class_type=bc.class_type,
                             total_berths=bc.total_berths,
-                            booked=booked_rt,
-                            available=available_rt,  # fixed earlier ✅ keep this
+                            booked=bc.total_berths - available,
+                            available=available,
                             price=bc.price
                         )
                     )
 
+                if return_train_class and not classes_rt:
+                    continue
 
                 return_list.append(
                     TrainAvailability(
@@ -456,21 +491,20 @@ def search_trains(
                         train_name=train.train_name,
                         train_number=str(train.train_no),
                         train_type=train.train_type,
-                        from_station=polish_to,   # ✅ always Polish
-                        to_station=polish_from,   # ✅ always Polish
+                        from_station=polish_to,
+                        to_station=polish_from,
                         travel_date=return_date,
-                        departure_time=rs_from_rt.departure_time,
-                        arrival_time=rs_to_rt.arrival_time,
+                        departure_time=rs_from.departure_time,
+                        arrival_time=rs_to.arrival_time,
                         departure_date=return_date,
                         classes=classes_rt
                     )
                 )
-
 
         return {"onward": result, "return": return_list}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Error in search_trains")
+        logger.exception("search_trains failed")
         raise HTTPException(500, str(e))

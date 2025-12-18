@@ -13,11 +13,16 @@ class SearchRequest(BaseModel):
     travel_date: date
     train_class: str
     time: str
-    return_date: Optional[str] = None
-    return_time: Optional[str] = None
     train_name:  Optional[str] = None
     train_number:  Optional[str] = None
     train_type: Optional[str] = None
+    return_date: Optional[str] = None
+    return_time: Optional[str] = None
+    return_train_class : Optional[str] = None
+    return_train_number: Optional[str] = None
+    return_train_name: Optional[str] = None
+    return_train_type: Optional[str] = None
+    
     
 
 class PassengerInfo(BaseModel):
