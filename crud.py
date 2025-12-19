@@ -133,6 +133,33 @@ def search_trains(
         if return_date and not return_train_class:
             return_train_class = train_class
 
+        # ---------------- Validate Return Journey Filters ----------------
+        if not return_date and any([return_train_class, return_train_number, return_train_name, return_train_type]):
+            raise HTTPException(
+                status_code=400,
+                detail="Please provide a return date to use return journey filters. Return train preferences require a return travel date."
+            )
+
+        # ---------------- Validate Time Format ----------------
+        try:
+            datetime.strptime(time, "%H:%M")
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Please enter a valid time in 24-hour format (HH:MM). Example: 14:30 for 2:30 PM"
+            )
+
+        # ---------------- Validate Return Time Format (if provided) ----------------
+        if return_time:
+            try:
+                datetime.strptime(return_time, "%H:%M")
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Please enter a valid return time in 24-hour format (HH:MM). Example: 18:45 for 6:45 PM"
+                )
+
+
 
         logger.info("🔥 search_trains called")
         logger.info(f"params: from={from_station_name} to={to_station_name} date={travel_date} time={time} train_number={train_number}")
