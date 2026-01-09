@@ -354,8 +354,10 @@ def search_trains(
                 class_map = {
                     "1st": "1st Class",
                     "first": "1st Class",
+                    "first class": "1st class",
                     "2nd": "2nd Class",
                     "second": "2nd Class",
+                    "second class": "2nd class",
                     "chair": "Chair Car",
                     "executive": "Executive Chair Car",
                     "exec": "Executive Chair Car"
@@ -532,9 +534,34 @@ def search_trains(
                 berth_q = db.query(BerthClass).filter(BerthClass.train_id == train.train_id)
 
                 if return_train_class:
+                    # Normalize user input return class type
+                    requested_return_class = normalize(return_train_class)
+
+                    # Map possible inputs to actual stored class names
+                    class_map = {
+                        "1st": "1st Class",
+                        "first": "1st Class",
+                        "first class": "1st Class",
+                        "2nd": "2nd Class",
+                        "second": "2nd Class",
+                        "second class": "2nd Class",
+                        "chair": "Chair Car",
+                        "executive": "Executive Chair Car",
+                        "exec": "Executive Chair Car"
+                    }
+
+                    # Find correct DB class value
+                    matched_return_class_name = next(
+                        (v for k, v in class_map.items() if k in requested_return_class),
+                        None
+                    )
+
+                    if not matched_return_class_name:
+                        raise HTTPException(400, "Invalid return train class type requested")
+
                     berth_q = berth_q.filter(
                         func.lower(BerthClass.class_type).like(
-                            f"%{normalize(return_train_class)}%"
+                            func.lower(f"%{matched_return_class_name}%")
                         )
                     )
 
